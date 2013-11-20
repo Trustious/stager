@@ -41,15 +41,15 @@ class OperationsManager
   end
 
   def stage(slot_name, fork_name, branch_name)
-    oeprate_on_slot(slot_name, fork_name, branch_name, :stage)
+    operate_on_slot(slot_name, fork_name, branch_name, :stage)
   end
 
   def restart(slot_name, fork_name, branch_name)
-    oeprate_on_slot(slot_name, fork_name, branch_name, :restart)
+    operate_on_slot(slot_name, fork_name, branch_name, :restart)
   end
 
   def clear_cache(slot_name, fork_name, branch_name)
-    oeprate_on_slot(slot_name, fork_name, branch_name, :clear_cache)
+    operate_on_slot(slot_name, fork_name, branch_name, :clear_cache)
   end
 
   def slots_info
