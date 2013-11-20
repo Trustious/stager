@@ -94,6 +94,12 @@ function handle_stage_response(data, textStatus, jqXHR) {
 function handle_update_lease_response(data, textStatus, jqXHR) {
 }
 
+function handle_restart_slot_response(data, textStatus, jqXHR) {
+}
+
+function handle_clear_slot_cache_response(data, textStatus, jqXHR) {
+}
+
 function handle_fork_info_response(koData, jsonData) {
   koData.setBranches(jsonData.branches);
 }
@@ -134,6 +140,24 @@ $(function() {
     $.post('/slot/' + data.name + '/update_lease', 
         {},
         handle_update_lease_response);
+  });
+
+  $('#slot_status').delegate('.restart_slot', 'click', function (e) {
+    e.preventDefault();
+    var data = ko.dataFor(this);
+    $.post('/slot/' + data.name + '/restart', 
+        { fork: data.currentFork,
+          branch: data.currentBranch},
+        handle_restart_slot_response);
+  });
+
+  $('#slot_status').delegate('.clear_slot_cache', 'click', function (e) {
+    e.preventDefault();
+    var data = ko.dataFor(this);
+    $.post('/slot/' + data.name + '/clear_cache', 
+        { fork: data.currentFork,
+          branch: data.currentBranch},
+        handle_clear_slot_cache_response);
   });
 
   update_slots_info(slots_info, null, null);
