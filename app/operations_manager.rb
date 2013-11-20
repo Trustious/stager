@@ -15,7 +15,7 @@ class OperationsManager
     slots_info
   end
 
-  def stage(slot_name, fork_name, branch_name)
+  def operate_on_slot(slot_name, fork_name, branch_name, operation)
     #FIXME can't stage multiple branches from same repo using current method :/
     if @slots.include?(slot_name)
       slot = @slots[slot_name]
@@ -28,7 +28,8 @@ class OperationsManager
         container.request_kill
       end
 
-      jid = OperationsManagerWorker.perform_async(slot_name, fork_name, branch_name)
+      jid = OperationsManagerWorker.perform_async(slot_name, fork_name, 
+                                                  branch_name, operation)
       if jid
         slot.job_id = jid
         slot.updated_at = Time.now
@@ -37,6 +38,10 @@ class OperationsManager
       end
     end
     return false
+  end
+
+  def stage(slot_name, fork_name, branch_name)
+    oeprate_on_slot(slot_name, fork_name, branch_name, :stage)
   end
 
   def slots_info
@@ -145,7 +150,11 @@ class OperationsManagerWorker
     end
   end
 
-  def perform(slot_name, fork_name, branch_name)
+  def perform(slot_name, fork_name, branch_name, operation=:stage)
+    self.send operation, slot_name, fork_name, branch_name
+  end
+
+  def stage(slot_name, fork_name, branch_name)
     # HORRENDOUS HACK to avoid sqlite database locks
     # FIXME FIXME FIXME
     sleep 1
