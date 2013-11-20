@@ -150,16 +150,20 @@ class OperationsManagerWorker
     end
   end
 
+  def get_slot(slot_name)
+    # HORRENDOUS HACK to avoid sqlite database locks
+    # FIXME FIXME FIXME
+    sleep 1
+    # /FIXME
+    ActiveSlot.get(slot_name)
+  end
+
   def perform(slot_name, fork_name, branch_name, operation=:stage)
     self.send operation, slot_name, fork_name, branch_name
   end
 
   def stage(slot_name, fork_name, branch_name)
-    # HORRENDOUS HACK to avoid sqlite database locks
-    # FIXME FIXME FIXME
-    sleep 1
-    # /FIXME
-    slot = ActiveSlot.get(slot_name)
+    slot = get_slot(slot_name)
 
     self.total = 8
 
