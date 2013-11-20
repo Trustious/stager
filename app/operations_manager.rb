@@ -222,6 +222,10 @@ class OperationsManagerWorker
         spawn_and_wait('./script/delayed_job start') > 0
       end
 
+      do_or_die 8, 'Clearing Cache' do
+        spawn_and_wait('rm -r ./tmp/*') > 0
+      end
+
       slot.job_id = ''
       slot.updated_at = Time.now
       slot.save
