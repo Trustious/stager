@@ -161,7 +161,7 @@ class OperationsManagerWorker
     # /FIXME
     slot = ActiveSlot.get(slot_name)
 
-    self.total = 7
+    self.total = 8
 
     at 1, 'Killing any running server'
     # kill any app we know is taking up this slot
