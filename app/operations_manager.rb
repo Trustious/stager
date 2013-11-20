@@ -48,6 +48,10 @@ class OperationsManager
     oeprate_on_slot(slot_name, fork_name, branch_name, :restart)
   end
 
+  def clear_cache(slot_name, fork_name, branch_name)
+    oeprate_on_slot(slot_name, fork_name, branch_name, :clear_cache)
+  end
+
   def slots_info
     return @slots_info if (Time.now - @slots_info_ts) < 1.5
     @slots_info_ts = Time.now
@@ -173,6 +177,31 @@ class OperationsManagerWorker
 
   def perform(slot_name, fork_name, branch_name, operation=:stage)
     self.send operation, slot_name, fork_name, branch_name
+  end
+
+  def clear_cache(slot_name, fork_name, branch_name)
+    slot = get_slot(slot_name)
+
+    self.total = 1
+
+    @app_dir = RepoManager.repo_dir slot.current_fork
+
+    Bundler.with_clean_env do
+      @cur_process_pid_file = File.join(@app_dir, Stager.settings.staging_process_pid)
+      server_pid_file = File.join(@app_dir, Stager.settings.server_pid)
+
+      # ensure the existance of the pids dir
+      FileUtils.mkdir_p(File.dirname(@cur_process_pid_file))
+      FileUtils.mkdir_p(File.dirname(server_pid_file))
+
+      do_or_die 8, 'Clearing Cache' do
+        spawn_and_wait('rm -r ./tmp/*') > 0
+      end
+
+      slot.job_id = ''
+      slot.updated_at = Time.now
+      slot.save
+    end
   end
 
   def restart(slot_name, fork_name, branch_name)
