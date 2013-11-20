@@ -44,6 +44,10 @@ class OperationsManager
     oeprate_on_slot(slot_name, fork_name, branch_name, :stage)
   end
 
+  def restart(slot_name, fork_name, branch_name)
+    oeprate_on_slot(slot_name, fork_name, branch_name, :restart)
+  end
+
   def slots_info
     return @slots_info if (Time.now - @slots_info_ts) < 1.5
     @slots_info_ts = Time.now
@@ -158,8 +162,86 @@ class OperationsManagerWorker
     ActiveSlot.get(slot_name)
   end
 
+  def kill_slot(slot)
+    # kill any app we know is taking up this slot
+    if slot.app_pid != -1 and !slot.current_fork.nil?
+      @app_dir = RepoManager.repo_dir(slot.current_fork)
+      kill_app slot.app_pid
+      slot.app_pid = -1
+    end
+  end
+
   def perform(slot_name, fork_name, branch_name, operation=:stage)
     self.send operation, slot_name, fork_name, branch_name
+  end
+
+  def restart(slot_name, fork_name, branch_name)
+    slot = get_slot(slot_name)
+
+    self.total = 7
+
+    at 1, 'Killing any running server'
+    kill_slot(slot)
+
+    @app_dir = RepoManager.repo_dir slot.current_fork
+
+    # FIXME what if the branch to stage is already staged in another slot
+
+    do_or_die 2, 'Updating repository' do
+      RepoManager.prepare_branch(slot.current_fork, slot.current_branch)
+    end
+
+    Bundler.with_clean_env do
+      @cur_process_pid_file = File.join(@app_dir, Stager.settings.staging_process_pid)
+      server_pid_file = File.join(@app_dir, Stager.settings.server_pid)
+
+      # ensure the existance of the pids dir
+      FileUtils.mkdir_p(File.dirname(@cur_process_pid_file))
+      FileUtils.mkdir_p(File.dirname(server_pid_file))
+
+      # stop any staging process currently running on this app
+      at 3, 'Killing old staging activity'
+      begin
+        pid = read_pid(@cur_process_pid_file)
+        OperationsManager.kill_process pid
+      rescue
+      end
+
+      # kill the current app if it is running and we don't know
+      if File.exists?(server_pid_file)
+        pid = read_pid(server_pid_file)
+        kill_app pid
+      end
+
+      @app_env['RAILS_ENV'] = 'staging'
+      @app_env['STAGING_HOST'] = "#{Stager.settings.host}:#{slot.port}"
+
+      do_or_die 4, 'Creating Gem Bundle' do
+        spawn_and_wait('bundle install') > 0
+      end
+
+      do_or_die 6, 'Starting app server' do
+        pid = spawn_and_wait("bundle exec rails server -p #{slot[:port]} -d")
+        if pid > 0
+          slot.app_pid = pid
+          slot.updated_at = Time.now
+          slot.save
+        end
+        pid > 0
+      end
+
+      do_or_die 7, 'Starting delayed_job worker' do
+        spawn_and_wait('./script/delayed_job start') > 0
+      end
+
+      do_or_die 8, 'Clearing Cache' do
+        spawn_and_wait('rm -r ./tmp/*') > 0
+      end
+
+      slot.job_id = ''
+      slot.updated_at = Time.now
+      slot.save
+    end
   end
 
   def stage(slot_name, fork_name, branch_name)
@@ -168,12 +250,7 @@ class OperationsManagerWorker
     self.total = 8
 
     at 1, 'Killing any running server'
-    # kill any app we know is taking up this slot
-    if slot.app_pid != -1 and !slot.current_fork.nil?
-      @app_dir = RepoManager.repo_dir(slot.current_fork)
-      kill_app slot.app_pid
-      slot.app_pid = -1
-    end
+    kill_slot(slot)
 
     slot.current_fork = fork_name
     slot.current_branch = branch_name
