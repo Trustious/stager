@@ -159,4 +159,22 @@ class Stager < Sinatra::Base
     slot.updated_at = Time.now
     slot.save!
   end
+
+  post '/slot/:slot/restart' do |slot|
+    if @op_man.restart(slot, params['fork'], params['branch'])
+      return 200
+    else
+      #FIXME error message
+      return 500
+    end
+  end
+
+  post '/slot/:slot/clear_cache' do |slot|
+    if @op_man.clear_cache(slot, params['fork'], params['branch'])
+      return 200
+    else
+      #FIXME error message
+      return 500
+    end
+  end
 end
